@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Notes 3.0</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#667085;--accent:#4f6ef7;--border:#dbe1ec}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text)}
+button,input{font:inherit}button{cursor:pointer}
+.app{min-height:100vh;padding:20px}.screen{display:none;min-height:calc(100vh - 40px)}.active{display:flex}
+#home{flex-direction:column}.top{display:flex;justify-content:space-between;align-items:center}
+.brand{font-size:26px;font-weight:800}.theme{padding:9px 14px;border:1px solid var(--border);border-radius:11px;background:var(--card);color:var(--text);font-size:15px}
+.home{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;max-width:850px;width:100%;margin:auto}
+h1{font-size:clamp(38px,7vw,62px);margin:0 0 38px;letter-spacing:-2px}
+.buttons{display:flex;flex-direction:column;gap:22px;width:min(650px,100%)}
+.buttons button{width:100%;min-height:82px;border:1px solid var(--border);border-radius:17px;background:var(--card);color:var(--text);font-size:19px;font-weight:700;box-shadow:0 8px 24px #00000010;transition:.16s}
+.buttons button:hover{transform:translateY(-2px);box-shadow:0 12px 28px #00000016}
+.buttons button:first-child{background:var(--accent);color:white;border-color:var(--accent)}
+.buttons button:first-child{background:var(--accent);color:white}
+.editor{flex-direction:column}.bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}
+.bar button{padding:10px 16px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text)}
+.done{background:var(--accent)!important;color:white!important}.content{width:min(1000px,100%);margin:auto;flex:1}
+.todo,.notes{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:18px;box-shadow:0 12px 35px #00000010}
+.task{display:flex;gap:10px;border-bottom:1px solid var(--border);min-height:50px}
+.num{width:32px;text-align:right;padding-top:13px;color:var(--muted)}.task input[type=text]{flex:1;border:0;outline:0;background:none;color:var(--text);font-size:18px}
+.task input[type=checkbox]{width:20px}.section{font-weight:800;color:var(--muted);margin:18px 0 8px}
+#noteArea{min-height:60vh;outline:0;padding:20px 5px;font-size:18px;line-height:1.65}.tools{display:flex;gap:7px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px}
+.tools button,.tools select{border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;padding:7px 10px}
+.saved{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:15px}
+.card{background:var(--card);padding:18px;border:1px solid var(--border);border-radius:18px}.card button{padding:8px 12px;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text)}
+@media(max-width:700px){.buttons{grid-template-columns:1fr}.buttons button{min-height:105px}.app{padding:14px}}
+</style>
+</head>
+<body>
+<div class="app">
+<section id="home" class="screen active">
+<div class="top"><div class="brand">Notes 3.0</div><button class="theme" onclick="theme()">Theme</button></div>
+<div class="home"><h1>Notes 3.0</h1><div class="buttons">
+<button onclick="newTodo()">Create To-Do List</button>
+<button onclick="newNotes()">Create Notes Page</button>
+<button onclick="saved()">Saved Pages</button>
+</div></div>
+</section>
+
+<section id="todoScreen" class="screen editor">
+<div class="bar"><button onclick="exitEditor()">← Back</button><b>To-Do List</b><button class="done" onclick="exitEditor()">Done</button></div>
+<div class="content"><div class="todo"><div id="tasks"></div><div class="section">Completed</div><div id="completed"></div></div></div>
+</section>
+
+<section id="notesScreen" class="screen editor">
+<div class="bar"><button onclick="exitEditor()">← Back</button><b>Notes</b><button class="done" onclick="exitEditor()">Done</button></div>
+<div class="content"><div class="notes">
+<div class="tools">
+<button onclick="cmd('bold')"><b>B</b></button><button onclick="cmd('italic')"><i>I</i></button>
+<button onclick="cmd('underline')"><u>U</u></button><select onchange="cmd('fontSize',this.value)">
+<option value="">Size</option><option value="2">Small</option><option value="4">Large</option><option value="6">Huge</option></select>
+<input type="color" onchange="cmd('foreColor',this.value)"><button onclick="cmd('insertOrderedList')">1. List</button>
+<button onclick="document.getElementById('img').click()">Add Image</button><input id="img" hidden type="file" accept="image/*" onchange="image(event)">
+</div><div id="noteArea" contenteditable="true"></div></div></div>
+</section>
+
+<section id="savedScreen" class="screen editor">
+<div class="bar"><button onclick="home()">← Back</button><b>Saved Pages</b><span></span></div>
+<div class="content"><div id="saved" class="saved"></div></div>
+</section>
+</div>
+
+<script>
+let pages=JSON.parse(localStorage.getItem("notes3")||"[]"),current=null,dirty=false,timer;
+const $=id=>document.getElementById(id);
+function show(id){document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));$(id).classList.add("active")}
+function home(){show("home");current=null;dirty=false}
+function save(){if(!current)return;if(current.type==="notes")current.html=$("noteArea").innerHTML;let i=pages.findIndex(x=>x.id===current.id);if(i<0)pages.unshift(current);else pages[i]=current;localStorage.setItem("notes3",JSON.stringify(pages));dirty=false}
+function auto(){clearTimeout(timer);timer=setTimeout(save,400)}
+function newTodo(){current={id:Date.now(),type:"todo",tasks:[{text:"",done:false}],completed:[]};dirty=true;renderTodo();show("todoScreen");focus(0)}
+function renderTodo(){let a=$("tasks"),c=$("completed");a.innerHTML="";c.innerHTML="";
+current.tasks.forEach((t,i)=>{let r=document.createElement("div");r.className="task";r.innerHTML=`<div class="num">${i+1}.</div><input type="text" value="${esc(t.text)}"><input type="checkbox" ${t.done?"checked":""}>`;let inp=r.children[1],chk=r.children[2];
+inp.oninput=()=>{t.text=inp.value;dirty=true;auto()};inp.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();current.tasks.splice(i+1,0,{text:"",done:false});renderTodo();focus(i+1);dirty=true;auto()}else if((e.key==="Backspace"||e.key==="Delete")&&!inp.value&&current.tasks.length>1){e.preventDefault();current.tasks.splice(i,1);renderTodo();focus(Math.max(0,i-1));dirty=true;auto()}};
+chk.onchange=()=>{if(chk.checked){current.completed.push({text:t.text,done:true});current.tasks.splice(i,1)}else t.done=false;renderTodo();dirty=true;auto()};a.appendChild(r)});
+current.completed.forEach((t,i)=>{let r=document.createElement("div");r.className="task";r.innerHTML=`<div class="num">✓</div><input type="text" value="${esc(t.text)}"><input type="checkbox" checked>`;r.children[2].onchange=()=>{current.tasks.push({text:t.text,done:false});current.completed.splice(i,1);renderTodo();dirty=true;auto()};c.appendChild(r)})}
+function focus(i){setTimeout(()=>document.querySelectorAll("#tasks input[type=text]")[i]?.focus(),0)}
+function newNotes(){current={id:Date.now(),type:"notes",html:""};$("noteArea").innerHTML="";dirty=true;show("notesScreen");$("noteArea").focus();auto()}
+$("noteArea").oninput=()=>{dirty=true;auto()}
+function cmd(c,v=null){document.execCommand(c,false,v);$("noteArea").focus();dirty=true;auto()}
+function image(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{document.execCommand("insertImage",false,r.result);dirty=true;auto()};r.readAsDataURL(f)}
+function exitEditor(){if(dirty){if(confirm("Your changes may not have fully auto-saved. Save changes?")){save();home()}else if(confirm("Discard all unsaved changes?"))home()}else{save();home()}}
+function saved(){let s=$("saved");s.innerHTML="";if(!pages.length){s.innerHTML='<div class="card">No saved pages yet.</div>'}pages.forEach(p=>{let d=document.createElement("div");d.className="card";let text=p.type==="todo"?p.tasks.map(x=>x.text).filter(Boolean).slice(0,3).join(" • "):strip(p.html).slice(0,100);d.innerHTML=`<h3>${p.type==="todo"?"To-Do List":"Notes Page"}</h3><p>${esc(text||"Empty page")}</p><button onclick="openPage(${p.id})">Open</button> <button onclick="del(${p.id})">Delete</button>`;s.appendChild(d)});show("savedScreen")}
+function openPage(id){current=pages.find(x=>x.id===id);current=structuredClone(current);dirty=false;if(current.type==="todo"){renderTodo();show("todoScreen")}else{$("noteArea").innerHTML=current.html;show("notesScreen")}}
+function del(id){if(confirm("Delete this saved page?")){pages=pages.filter(x=>x.id!==id);localStorage.setItem("notes3",JSON.stringify(pages));saved()}}
+function theme(){
+let choice=prompt("Choose a theme:\n\n1. Light\n2. Dark\n3. Blue\n4. Green\n5. Purple\n6. Pink\n7. Slate");
+if(!choice)return;
+let names={1:"light",2:"dark",3:"blue",4:"green",5:"purple",6:"pink",7:"slate"};
+let n=names[choice]||choice.toLowerCase();
+let t={
+light:["#f5f7fb","#fff","#172033","#4f6ef7"],
+dark:["#10131a","#181d27","#f4f6fb","#7187ff"],
+blue:["#eff6ff","#fff","#12243d","#2878d8"],
+green:["#f1f8f4","#fff","#163027","#29966a"],
+purple:["#f6f2ff","#fff","#27183e","#7a56d8"],
+pink:["#fff2f7","#fff","#3a1827","#d84f86"],
+slate:["#eef1f5","#fff","#202938","#53657d"]
+}[n];
+if(!t)return alert("Theme not found.");
+document.documentElement.style.setProperty("--bg",t[0]);
+document.documentElement.style.setProperty("--card",t[1]);
+document.documentElement.style.setProperty("--text",t[2]);
+document.documentElement.style.setProperty("--accent",t[3]);
+localStorage.setItem("theme",n);
+}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function strip(h){let d=document.createElement("div");d.innerHTML=h;return d.textContent||""}
+</script>
+</body>
+</html>
